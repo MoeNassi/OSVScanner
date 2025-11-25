@@ -1,4 +1,4 @@
-** Linux **
+**Linux**
 
     - python3 -m venv .venv
     - pip install requests
@@ -6,7 +6,7 @@
     - copy packages.json to this folder and name it exactly like this 'packages.json' for nodejs otherwise for python use this command:
         - pip freeze > packages.txt
 
-** Windows **
+**Windows**
 
     - python3 -m venv .venv
     - pip install requests
