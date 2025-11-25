@@ -1,4 +1,4 @@
-import requests, sys, json
+import requests, sys, json, subprocess
 
 def getCVEversion(name, version, ecosystem):
     url = 'https://api.osv.dev/v1/query'
@@ -22,7 +22,24 @@ if sys.argv.__len__() == 1:
 program = sys.argv[1].lower()
 lines = []
 
-if program == 'npm':
+if program == 'os':
+    result = subprocess.run(
+        "lsb_release -a | grep 'Distributor ID' | awk '{print $3}'",
+        shell=True,
+        capture_output=True,
+        text=True
+    )
+    eco = result.stdout.strip()
+    operatingSystems = ['debian', 'ubuntu']
+    if eco in operatingSystems:
+        result = subprocess.run(
+            "dpkg-query -W -f='${binary:Package} ${Version}\n'",
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+        lines = result.stdout.strip().split('\n')
+elif program == 'npm':
     with open('packages.json', 'r') as file:
         jsonLines = file.readlines()
     line = "".join(jsonLines)
@@ -30,13 +47,17 @@ if program == 'npm':
     packages = resp['dependencies']
     for name, version in packages.items():
         lines.append(f'{name}=={version.split('^')[1]}')
+    eco = 'npm'
 elif program == 'python':
     with open('packages.txt', 'r') as file:
         lines = file.readlines()
+    eco = 'PyPI'
 else:
-    print('\033[31mError\033[0m:\n\tPlease choose either \033[30mnpm/python\033[0m')
+    print('\033[31mError\033[0m:\n\tPlease choose either \033[30mnpm/python/os\033[0m')
     exit()
 
+
+print(lines)
 for line in lines:
     pkg = line.strip()
     if '==' in pkg:
@@ -44,14 +65,8 @@ for line in lines:
     else:
         name, version = line.strip().split(' ')
 
-    if program == 'npm':
-        vulns = getCVEversion(name, version, 'npm')
-    elif program == 'python':
-        vulns = getCVEversion(name, version, 'PyPI')
-    else:
-        print('\033[31mError\033[0m:\n\tPlease choose either \033[30mnpm/python\033[0m')
-        exit()
-    
+    vulns = getCVEversion(name, version, eco)
+
     if not vulns:
         print(f'\033[34mPackage\033[0m: {name} {version}')
         print('\033[34m\tStatus\033[0m: Package is up to date')

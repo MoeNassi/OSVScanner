@@ -1,4 +1,4 @@
-django==2.1
+django==6.2
 requests==2.31.0
 numpy==1.26.4
 flask==3.0.1
