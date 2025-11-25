@@ -5,6 +5,7 @@
     - source .venv/bin/activate
     - copy packages.json to this folder and name it exactly like this 'packages.json' for nodejs otherwise for python use this command:
         - pip freeze > packages.txt
+    - python3 scanner.py npm
 
 **Windows**
 
@@ -13,3 +14,4 @@
     - ./.venv/Script/Activate.ps1
     - copy packages.json to this folder and name it exactly like this 'packages.json' for nodejs otherwise for python use this command:
         - pip freeze > packages.txt
+    - python3 scanner.py npm
