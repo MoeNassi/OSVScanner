@@ -1,5 +1,10 @@
-import requests, sys, json, subprocess
+import requests, shutil, sys, json, subprocess, datetime
+from openpyxl import load_workbook 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+TEMPLATE_PATH = "template/ScanResult.xlsx"
+
+NEW_FILE = f'ScanResult_{datetime.date.today()}.xlsx'
 
 def getCVEversion(name, version, ecosystem):
     url = 'https://api.osv.dev/v1/query'
@@ -16,12 +21,12 @@ def getCVEversion(name, version, ecosystem):
         return res['vulns']
     return None
 
-
 if sys.argv.__len__() == 1:
-    print('Please add the packages language !\n\033[31mUsage\033[0m:\n\t\033[33mpython3 ./scanner.py [eg: npm, python]\033[0m')
+    print('Please add the packages language !\n\033[31mUsage\033[0m:\n\t\033[33mpython3 ./scanner.py [eg: npm, python, os]\033[0m')
     exit()
 program = sys.argv[1].lower()
 lines = []
+all_rows = []
 
 if program == 'os':
     result = subprocess.run(
@@ -46,7 +51,7 @@ if program == 'os':
         print(f'\033[31mError\033[0m:\n\tYour os \033[35m{eco}\033[0m not in the specified list')
         exit()
 elif program == 'npm':
-    with open('packages.json', 'r') as file:
+    with open('packages/packages.json', 'r') as file:
         jsonLines = file.readlines()
     line = "".join(jsonLines)
     resp = json.loads(line)
@@ -55,7 +60,7 @@ elif program == 'npm':
         lines.append(f'{name}=={version.split('^')[1]}')
     eco = 'npm'
 elif program == 'python':
-    with open('packages.txt', 'r') as file:
+    with open('packages/packages.txt', 'r') as file:
         lines = file.readlines()
     eco = 'PyPI'
 else:
@@ -77,11 +82,16 @@ def print_package_result(name, version, vulns):
     if not vulns:
         print('\033[34m\tStatus\033[0m: Package is up to date')
     else:
+        rows = []
         for vuln in vulns:
             aliases = vuln.get('aliases', [])
             cves = [a for a in aliases if a.startswith("CVE-")]
-            if cves:
-                print(f'\033[34m\tCVE\033[0m: \033[31m⚠ {cves[0]} \033[0m')
+        if cves:
+            print(f'\033[34m\tCVE\033[0m: \033[31m⚠ {cves[0]} \033[0m')
+            rows.append({
+                'MachineA': f'{name} - {version} - {cves[0]}'
+            })
+            return rows
 
 max_workers = 20
 
@@ -94,6 +104,32 @@ with ThreadPoolExecutor(max_workers=max_workers) as executor:
     for future in as_completed(future_to_pkg):
         try:
             name, version, vulns = future.result()
-            print_package_result(name, version, vulns)
+            row = print_package_result(name, version, vulns)
+            all_rows.extend(row)
         except Exception as e:
             print(f'\033[31mError\033[0m: {e}')
+
+if all_rows:
+    shutil.copy(TEMPLATE_PATH, NEW_FILE)
+
+    wb = load_workbook(NEW_FILE)
+    ws = wb.active
+    
+    machine_col = None
+    for col in range(1, ws.max_column + 1):
+        if ws.cell(row=1, column=col).value == "MachineA":
+            machine_col = col
+            break
+    
+    if machine_col is None:
+        raise Exception("Header 'MachineA' not found in template")
+    
+    row_index = 2
+    while ws.cell(row=row_index, column=machine_col).value is not None:
+        row_index += 1
+    
+    for row_data in all_rows:
+        ws.cell(row=row_index, column=machine_col, value=row_data['MachineA'])
+        row_index += 1
+
+    wb.save(NEW_FILE)
